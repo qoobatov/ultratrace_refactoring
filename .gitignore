@@ -41,8 +41,8 @@ Thumbs.db
 *.so
 *.pyd
 
-# Data
-data/
+# # Data
+# data/
 
 # Generated medical image folders
 *_dicom_to_png/
