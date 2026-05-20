@@ -25,12 +25,22 @@ class PointsPayload(BaseModel):
     points: list[Point]
 
 
+class ColorData(BaseModel):
+    color: str
+
+
 @router.get("/traces")
 async def list_traces(study: StudySession = Depends(get_study_session)):
-    """List of all traces."""
+    """Список всех трасс с цветами."""
     names = study.get_trace_names()
     default = study.get_default_trace()
-    return {"traces": names, "default": default}
+    colors = {}
+    for name in names:
+        try:
+            colors[name] = study.contours.get_trace_color(name)
+        except:
+            colors[name] = "#ff0000"
+    return {"traces": names, "default": default, "colors": colors}
 
 
 @router.post("/traces")
@@ -67,10 +77,10 @@ async def rename_trace(
 
 @router.put("/traces/{name}/color")
 async def set_color(
-    name: str, color: str = Body(...), study: StudySession = Depends(get_study_session)
+    name: str, data: ColorData, study: StudySession = Depends(get_study_session)
 ):
     try:
-        study.recolor_trace(name, color)
+        study.recolor_trace(name, data.color)
         return {"status": "ok"}
     except KeyError:
         raise HTTPException(status_code=404, detail="Trace not found")
@@ -105,6 +115,29 @@ async def clear_frame(
 ):
     try:
         study.clear_trace_points(trace_name, frame_number)
+        return {"status": "ok"}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+
+@router.put("/traces/{name}/set-default")
+async def set_default_trace(
+    name: str, study: StudySession = Depends(get_study_session)
+):
+    try:
+        study.set_default_trace(name)
+        return {"status": "ok"}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+
+@router.delete("/traces/{trace_name}/frames")
+async def clear_all_frames(
+    trace_name: str, study: StudySession = Depends(get_study_session)
+):
+    """Очистить все кадры для трассы (сбросить все точки)."""
+    try:
+        study.clear_all_trace_points(trace_name)
         return {"status": "ok"}
     except KeyError:
         raise HTTPException(status_code=404, detail="Trace not found")

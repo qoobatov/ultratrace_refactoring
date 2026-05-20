@@ -54,6 +54,7 @@ class StudySession:
         default_cls = READERS[self.mode][0]
         self._set_reader(default_cls)
 
+        # Аудио
         audio_ext = next(
             (e for e in [".wav", ".flac", ".ogg", ".mp3"] if e in ext), None
         )
@@ -67,6 +68,7 @@ class StudySession:
                 logger.warning("Failed to load audio, continuing without it.")
                 self.audio_reader = None
 
+        # TextGrid
         self.textgrid = None
         self.frame_tier_name = None
         tg_rel = ext.get(".TextGrid")
@@ -75,10 +77,15 @@ class StudySession:
             self.textgrid = load_textgrid(tg_path)
         else:
             max_time = 1.0
-            if self.reader and self.reader.loaded:
-                times = self.reader.getFrameTimes()
-                if times:
-                    max_time = times[-1]
+            if (
+                self.reader
+            ):  # reader ещё не загружен, но getFrameTimes можно вызвать без загрузки пикселей для некоторых ридеров
+                try:
+                    times = self.reader.getFrameTimes()
+                    if times:
+                        max_time = times[-1]
+                except:
+                    pass
             from textgrid import TextGrid as TGFile, IntervalTier
 
             self.textgrid = TGFile(maxTime=max_time)
@@ -88,10 +95,14 @@ class StudySession:
 
         self.frame_tier_name = find_frame_tier_name(self.textgrid)
         if not self.frame_tier_name:
-            frame_times = self.get_frame_times()
-            if frame_times:
-                generate_frame_tier(self.textgrid, frame_times)
-                self.frame_tier_name = "frames"
+            # Генерируем frame tier, если есть тайминги
+            try:
+                frame_times = self.reader.getFrameTimes() if self.reader else []
+                if frame_times:
+                    generate_frame_tier(self.textgrid, frame_times)
+                    self.frame_tier_name = "frames"
+            except:
+                pass
 
     def _set_reader(self, reader_cls):
         if self.mode == "dicom":
@@ -104,9 +115,13 @@ class StudySession:
             self.reader = reader_cls(self.ult_path, self.us_txt_path)
         else:
             self.reader = None
+        # НЕ вызываем load() здесь – загрузка будет ленивой
+
+    def _ensure_reader_loaded(self):
         if self.reader and not self.reader.loaded:
             self.reader.load()
 
+    # ---------- Основные методы ----------
     def list_files(self):
         result = []
         for i, fset in enumerate(self.file_sets):
@@ -128,15 +143,17 @@ class StudySession:
         self._init_current_file()
 
     def get_frame(self, index: int) -> Image.Image:
-        if not self.reader or not self.reader.loaded:
+        if not self.reader:
             raise RuntimeError("Reader not initialized")
+        self._ensure_reader_loaded()
         img = self.reader.getFrame(index)
         if img is None:
             raise ValueError(f"Frame {index} not found")
         return img
 
     def get_frame_times(self) -> list:
-        if self.reader and self.reader.loaded:
+        if self.reader:
+            self._ensure_reader_loaded()  # на всякий случай, хотя getFrameTimes часто работает без загрузки
             return self.reader.getFrameTimes()
         return []
 
@@ -152,6 +169,7 @@ class StudySession:
         else:
             raise ValueError(f"Unknown method: {method_label}")
 
+    # TextGrid
     def get_all_intervals(self) -> list:
         if not self.textgrid:
             return []
@@ -164,7 +182,7 @@ class StudySession:
     def search(self, pattern: str, context_size: int = 3) -> list:
         return search_intervals(self.get_all_intervals(), pattern, context_size)
 
-    # Audio
+    # Аудио
     def get_audio_filepath(self) -> str | None:
         if self.audio_reader and self.audio_reader.loaded:
             return self.audio_reader.filepath
@@ -175,7 +193,7 @@ class StudySession:
             return self.audio_reader.duration
         return None
 
-    # Contours
+    # Контуры
     def get_trace_names(self):
         return self.contours.trace_names()
 

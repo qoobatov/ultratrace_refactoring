@@ -7,8 +7,18 @@ from app.core.study import StudySession
 router = APIRouter(prefix="/frames", tags=["frames"])
 
 
+@router.get("/times")
+async def get_frame_times(study: StudySession = Depends(get_study_session)):
+    """Возвращает список временных меток всех кадров (в секундах)."""
+    times = study.get_frame_times()
+    if not times:
+        raise HTTPException(status_code=404, detail="No frame times available")
+    return {"times": times, "count": len(times)}
+
+
 @router.get("/{index}")
 async def get_frame(index: int, study: StudySession = Depends(get_study_session)):
+    """Возвращает PNG-изображение кадра по его номеру (начиная с 1)."""
     try:
         img = study.get_frame(index)
         buf = io.BytesIO()
