@@ -29,6 +29,8 @@ class StudySession:
         self.current_file = self.file_sets[self.current_file_index]
 
         self.contours = ContourManager(self.data_path)
+        self.offset = self._load_offset()
+        self._original_frame_times = []
 
         self.reader = None
         self.mode = None
@@ -36,6 +38,34 @@ class StudySession:
         self.textgrid = None
         self.frame_tier_name = None
         self._init_current_file()
+
+    def _load_offset(self):
+        offset_file = os.path.join(self.data_path, "offset.txt")
+        if os.path.exists(offset_file):
+            try:
+                with open(offset_file, "r") as f:
+                    return float(f.read().strip())
+            except:
+                return 0.0
+        return 0.0
+
+    def _save_offset(self):
+        offset_file = os.path.join(self.data_path, "offset.txt")
+        with open(offset_file, "w") as f:
+            f.write(str(self.offset))
+
+    def set_frame_offset(self, offset_ms: float):
+        """Установить смещение кадров относительно аудио (в миллисекундах)."""
+        self.offset = offset_ms / 1000.0
+        self._save_offset()
+        if self.textgrid and self._original_frame_times:
+            new_times = [t + self.offset for t in self._original_frame_times]
+            generate_frame_tier(
+                self.textgrid, new_times, self.frame_tier_name or "frames"
+            )
+            self.frame_tier_name = (
+                find_frame_tier_name(self.textgrid) or self.frame_tier_name
+            )
 
     def _init_current_file(self):
         ext = self.current_file["extensions"]
@@ -53,6 +83,13 @@ class StudySession:
 
         default_cls = READERS[self.mode][0]
         self._set_reader(default_cls)
+
+        # Сохраняем оригинальные времена кадров до применения offset
+        if self.reader:
+            try:
+                self._original_frame_times = self.reader.getFrameTimes()
+            except:
+                self._original_frame_times = []
 
         # Аудио
         audio_ext = next(
@@ -77,15 +114,8 @@ class StudySession:
             self.textgrid = load_textgrid(tg_path)
         else:
             max_time = 1.0
-            if (
-                self.reader
-            ):  # reader ещё не загружен, но getFrameTimes можно вызвать без загрузки пикселей для некоторых ридеров
-                try:
-                    times = self.reader.getFrameTimes()
-                    if times:
-                        max_time = times[-1]
-                except:
-                    pass
+            if self._original_frame_times:
+                max_time = max(self._original_frame_times) + self.offset
             from textgrid import TextGrid as TGFile, IntervalTier
 
             self.textgrid = TGFile(maxTime=max_time)
@@ -95,14 +125,10 @@ class StudySession:
 
         self.frame_tier_name = find_frame_tier_name(self.textgrid)
         if not self.frame_tier_name:
-            # Генерируем frame tier, если есть тайминги
-            try:
-                frame_times = self.reader.getFrameTimes() if self.reader else []
-                if frame_times:
-                    generate_frame_tier(self.textgrid, frame_times)
-                    self.frame_tier_name = "frames"
-            except:
-                pass
+            frame_times = self.get_frame_times()
+            if frame_times:
+                generate_frame_tier(self.textgrid, frame_times)
+                self.frame_tier_name = "frames"
 
     def _set_reader(self, reader_cls):
         if self.mode == "dicom":
@@ -115,7 +141,7 @@ class StudySession:
             self.reader = reader_cls(self.ult_path, self.us_txt_path)
         else:
             self.reader = None
-        # НЕ вызываем load() здесь – загрузка будет ленивой
+        # Ленивая загрузка
 
     def _ensure_reader_loaded(self):
         if self.reader and not self.reader.loaded:
@@ -140,6 +166,10 @@ class StudySession:
             raise IndexError("File index out of range")
         self.current_file_index = index
         self.current_file = self.file_sets[index]
+        self.offset = (
+            self._load_offset()
+        )  # заново читаем offset для нового файла (если разные)
+        self._original_frame_times = []
         self._init_current_file()
 
     def get_frame(self, index: int) -> Image.Image:
@@ -152,8 +182,10 @@ class StudySession:
         return img
 
     def get_frame_times(self) -> list:
+        if self._original_frame_times:
+            return [t + self.offset for t in self._original_frame_times]
         if self.reader:
-            self._ensure_reader_loaded()  # на всякий случай, хотя getFrameTimes часто работает без загрузки
+            self._ensure_reader_loaded()
             return self.reader.getFrameTimes()
         return []
 
