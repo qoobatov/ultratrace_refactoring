@@ -18,13 +18,13 @@ async def get_frame_times(study: StudySession = Depends(get_study_session)):
 
 @router.get("/{index}")
 async def get_frame(index: int, study: StudySession = Depends(get_study_session)):
-    """Возвращает PNG-изображение кадра по его номеру (начиная с 1)."""
     try:
         img = study.get_frame(index)
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        # Меняем PNG на JPEG с качеством 85%
+        img.save(buf, format="JPEG", quality=85)
         buf.seek(0)
-        return Response(content=buf.read(), media_type="image/png")
+        return Response(content=buf.read(), media_type="image/jpeg")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
