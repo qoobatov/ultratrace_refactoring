@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from app.api.deps import get_study_session
 from app.core.study import StudySession
+from app.core.io.auto_trace import auto_trace
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/contours", tags=["contours"])
@@ -141,3 +142,20 @@ async def clear_all_frames(
         return {"status": "ok"}
     except KeyError:
         raise HTTPException(status_code=404, detail="Trace not found")
+
+
+@router.post("/traces/{trace_name}/frames/{frame_number}/auto-trace")
+async def auto_trace_frame(
+    trace_name: str,
+    frame_number: int,
+    study: StudySession = Depends(get_study_session),
+):
+    try:
+        image = study.get_frame(frame_number)
+        points = auto_trace(image)
+        study.save_trace_points(trace_name, frame_number, points)
+        return {"status": "ok", "points": points}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Trace not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
