@@ -9,3 +9,4 @@ textgrid>=1.5
 pydub>=0.25.1
 soundfile>=0.12
 scipy>=1.10
+mutagen
