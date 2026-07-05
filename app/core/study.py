@@ -34,6 +34,8 @@ class StudySession:
 
         self.reader = None
         self.mode = None
+        self._current_method_label = None  # метка текущего метода
+        self._reader_cache = {}  # {(file_index, method_label): reader}
         self.audio_reader = None
         self.textgrid = None
         self.frame_tier_name = None
@@ -81,7 +83,13 @@ class StudySession:
         else:
             raise ValueError("Unsupported file set")
 
+        # Используем тот же метод что был активен, либо дефолтный
         default_cls = READERS[self.mode][0]
+        if (
+            self._current_method_label
+            and self._current_method_label in LABEL_TO_READER.get(self.mode, {})
+        ):
+            default_cls = LABEL_TO_READER[self.mode][self._current_method_label]
         self._set_reader(default_cls)
 
         # Сохраняем оригинальные времена кадров до применения offset
@@ -131,6 +139,17 @@ class StudySession:
                 self.frame_tier_name = "frames"
 
     def _set_reader(self, reader_cls):
+        """Устанавливает ридер, используя кеш если доступен."""
+        label = reader_cls.label
+        cache_key = (self.current_file_index, label)
+
+        if cache_key in self._reader_cache:
+            self.reader = self._reader_cache[cache_key]
+            self._current_method_label = label
+            logger.debug("Reader cache hit: %s", cache_key)
+            return
+
+        # Создаём новый ридер
         if self.mode == "dicom":
             processed = self.current_file.get("processed")
             if reader_cls == DicomPNGReader and processed:
@@ -141,11 +160,20 @@ class StudySession:
             self.reader = reader_cls(self.ult_path, self.us_txt_path)
         else:
             self.reader = None
-        # Ленивая загрузка
+
+        if self.reader:
+            self._reader_cache[cache_key] = self.reader
+        self._current_method_label = label
+        logger.debug("Reader cache miss, created: %s", cache_key)
 
     def _ensure_reader_loaded(self):
         if self.reader and not self.reader.loaded:
             self.reader.load()
+
+    def _clear_reader_cache(self):
+        """Очищает кеш ридеров — вызывается при смене метода."""
+        self._reader_cache.clear()
+        logger.debug("Reader cache cleared")
 
     # ---------- Основные методы ----------
     def list_files(self):
@@ -166,9 +194,7 @@ class StudySession:
             raise IndexError("File index out of range")
         self.current_file_index = index
         self.current_file = self.file_sets[index]
-        self.offset = (
-            self._load_offset()
-        )  # заново читаем offset для нового файла (если разные)
+        self.offset = self._load_offset()
         self._original_frame_times = []
         self._init_current_file()
 
@@ -197,6 +223,8 @@ class StudySession:
     def change_method(self, method_label: str):
         if self.mode and method_label in LABEL_TO_READER[self.mode]:
             cls = LABEL_TO_READER[self.mode][method_label]
+            # Метод меняется глобально — кеш всех файлов устарел
+            self._clear_reader_cache()
             self._set_reader(cls)
         else:
             raise ValueError(f"Unknown method: {method_label}")
