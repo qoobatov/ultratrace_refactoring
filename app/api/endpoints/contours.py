@@ -1,4 +1,7 @@
+import csv
+import io
 from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi.responses import StreamingResponse
 from app.api.deps import get_study_session
 from app.core.study import StudySession
 from app.core.io.auto_trace import auto_trace
@@ -159,3 +162,52 @@ async def auto_trace_frame(
         raise HTTPException(status_code=404, detail="Trace not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/export")
+async def export_contours(study: StudySession = Depends(get_study_session)):
+    """
+    Экспортирует все аннотированные точки в CSV.
+    Колонки: file, trace, frame, time, tier, interval_label, x, y
+    """
+    all_points = study.contours.get_all_points()
+    if not all_points:
+        raise HTTPException(status_code=404, detail="No annotated points found")
+
+    frame_times = study.get_frame_times()
+    intervals = study.get_all_intervals()
+
+    def find_interval_labels(time: float) -> dict:
+        result = {}
+        for iv in intervals:
+            if iv["start"] <= time < iv["end"]:
+                result[iv["tier"]] = iv["text"]
+        return result
+
+    fname = study.current_file.get("name", "export")
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        ["file", "trace", "frame", "time", "tier", "interval_label", "x", "y"]
+    )
+
+    for pt in all_points:
+        frame = pt["frame"]
+        time = frame_times[frame - 1] if 0 < frame <= len(frame_times) else ""
+        tier_labels = find_interval_labels(time) if time != "" else {}
+
+        if tier_labels:
+            for tier, label in tier_labels.items():
+                writer.writerow(
+                    [fname, pt["trace"], frame, time, tier, label, pt["x"], pt["y"]]
+                )
+        else:
+            writer.writerow([fname, pt["trace"], frame, time, "", "", pt["x"], pt["y"]])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=contours_{fname}.csv"},
+    )

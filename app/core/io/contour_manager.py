@@ -199,6 +199,14 @@ class ContourManager:
         with self.conn:
             self.conn.execute("DELETE FROM points WHERE trace_name=?", (trace_name,))
 
+    def get_all_points(self) -> List[dict]:
+        """Возвращает все точки всех трасс — для экспорта."""
+
+        rows = self.conn.execute("""SELECT trace_name, frame, x, y
+           FROM points
+           ORDER BY trace_name, frame, id""").fetchall()
+        return [{"trace": r[0], "frame": r[1], "x": r[2], "y": r[3]} for r in rows]
+
     # ----- Утилиты -----
 
     def _trace_exists(self, name: str) -> bool:
