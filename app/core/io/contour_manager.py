@@ -207,6 +207,13 @@ class ContourManager:
            ORDER BY trace_name, frame, id""").fetchall()
         return [{"trace": r[0], "frame": r[1], "x": r[2], "y": r[3]} for r in rows]
 
+    def get_annotated_frame_count(self, trace_name: str) -> int:
+        """Количество кадров с хотя бы одной точкой."""
+        row = self.conn.execute(
+            "SELECT COUNT(DISTINCT frame) FROM points WHERE trace_name=?", (trace_name,)
+        ).fetchone()
+        return row[0] if row else 0
+
     # ----- Утилиты -----
 
     def _trace_exists(self, name: str) -> bool:

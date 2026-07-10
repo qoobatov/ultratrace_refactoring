@@ -211,3 +211,12 @@ async def export_contours(study: StudySession = Depends(get_study_session)):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=contours_{fname}.csv"},
     )
+
+
+@router.get("/traces/{trace_name}/annotated-count")
+async def get_annotated_count(
+    trace_name: str, study: StudySession = Depends(get_study_session)
+):
+    """Количество кадров с аннотациями для трассы."""
+    count = study.contours.get_annotated_frame_count(trace_name)
+    return {"count": count}
