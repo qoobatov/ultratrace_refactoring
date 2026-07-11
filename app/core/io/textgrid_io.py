@@ -51,8 +51,9 @@ def generate_frame_tier(
     :param tier_name: желаемое имя слоя
     """
     # Удаляем существующий одноимённый слой, если он есть
-    if tier_name in tg.getNames():
-        tg.pop(tier_name)
+    names = tg.getNames()
+    if tier_name in names:
+        tg.pop(names.index(tier_name))
 
     # Определяем максимальное время
     try:
@@ -62,9 +63,10 @@ def generate_frame_tier(
 
     tier = PointTier(tier_name, maxTime=max_time)
     for i, t in enumerate(frame_times):
-        tier.addPoint(Point(t, str(i)))  # i – номер кадра, начиная с 0
+        tier.addPoint(Point(t, str(i)))
+    if max_time > tg.maxTime:
+        tg.maxTime = max_time
     tg.append(tier)
-    tg.maxTime = max_time
 
 
 def extract_intervals(tg: TextGridFile, frame_tier_name: str = "frames") -> list[dict]:
