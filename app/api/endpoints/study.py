@@ -52,3 +52,12 @@ async def set_frame_offset(
 async def get_offset(study: StudySession = Depends(get_study_session)):
     """Возвращает текущий сдвиг кадров в миллисекундах."""
     return {"offset": study.offset * 1000.0}
+
+
+@router.post("/rescan")
+async def rescan_study(study: StudySession = Depends(get_study_session)):
+    try:
+        files = study.rescan()
+        return {"status": "ok", "current": study.current_file_index, "files": files}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))

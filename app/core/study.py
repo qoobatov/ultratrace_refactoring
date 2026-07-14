@@ -10,7 +10,7 @@ from .io.textgrid_io import (
 )
 from .io.audio_reader import AudioReader
 from .io.contour_manager import ContourManager
-from .io.file_discovery import discover_study_files
+from .io.file_discovery import load_or_generate_metadata
 from .search_service import search_intervals
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,8 @@ US_TXT_SUFFIX = "US.txt"
 class StudySession:
     def __init__(self, data_path: str):
         self.data_path = os.path.abspath(data_path)
-        self.file_sets = discover_study_files(self.data_path)
+        metadata = load_or_generate_metadata(self.data_path)
+        self.file_sets = metadata["files"]
         if not self.file_sets:
             raise FileNotFoundError(f"No valid study files found in {self.data_path}")
 
@@ -198,6 +199,31 @@ class StudySession:
         self._original_frame_times = []
         self._init_current_file()
 
+    def rescan(self):
+        """
+        Заново сканирует директорию и обновляет metadata.json и file_sets
+        (см. issue #3 — metadata.json остаётся первичным индексом директории,
+        и его нужно уметь пересобрать без перезапуска сервера).
+
+        Не теряет текущий открытый файл, если он всё ещё присутствует
+        в новом списке; если исходный файл исчез (переименован/удалён
+        на диске), откатывается на первый доступный файл.
+        """
+        current_name = self.current_file["name"] if self.current_file else None
+
+        metadata = load_or_generate_metadata(self.data_path, force_rescan=True)
+        self.file_sets = metadata["files"]
+        if not self.file_sets:
+            raise FileNotFoundError(f"No valid study files found in {self.data_path}")
+
+        new_index = next(
+            (i for i, fs in enumerate(self.file_sets) if fs["name"] == current_name),
+            0,
+        )
+        if new_index != self.current_file_index:
+            self.switch_file(new_index)
+        return self.list_files()
+
     def get_frame(self, index: int) -> Image.Image:
         if not self.reader:
             raise RuntimeError("Reader not initialized")
@@ -279,7 +305,7 @@ class StudySession:
         self.contours.set_points(trace_name, frame_number, points)
 
     def clear_trace_points(self, trace_name, frame_number):
-        self.contours.clear_frame(trace_name, frame_number)
+        self.contours.clear_trace(trace_name, frame_number)
 
     def clear_all_trace_points(self, trace_name):
         self.contours.clear_trace(trace_name)
