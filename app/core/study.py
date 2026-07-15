@@ -305,7 +305,7 @@ class StudySession:
         self.contours.set_points(trace_name, frame_number, points)
 
     def clear_trace_points(self, trace_name, frame_number):
-        self.contours.clear_trace(trace_name, frame_number)
+        self.contours.clear_frame(trace_name, frame_number)
 
     def clear_all_trace_points(self, trace_name):
         self.contours.clear_trace(trace_name)
