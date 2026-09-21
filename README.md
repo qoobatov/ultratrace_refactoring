@@ -17,7 +17,7 @@ Open a terminal in the extracted folder:
 ```bash
 python -m venv venv
 source venv/bin/activate      # Linux/macOS
-# or: venv\Scripts\activate   # Windows
+# or: venv/Scripts/activate   # Windows
 pip install .
 ```
 
