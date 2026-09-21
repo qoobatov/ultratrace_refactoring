@@ -1,0 +1,48 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: qoobatov/ultratrace-frontend
+          path: frontend-src
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build frontend
+        working-directory: frontend-src
+        run: |
+          npm install
+          npm run build
+
+      - name: Copy frontend build into backend
+        run: cp -r frontend-src/dist frontend_dist
+
+      - name: Package release archive
+        run: |
+          zip -r ultratrace-${{ github.ref_name }}.zip . \
+            -x "venv/*" \
+            -x ".git/*" \
+            -x "data/*" \
+            -x "__pycache__/*" \
+            -x "*.pyc" \
+            -x "frontend-src/*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ultratrace-${{ github.ref_name }}.zip
