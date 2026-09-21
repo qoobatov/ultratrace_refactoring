@@ -6,7 +6,7 @@
 
 ### 2. Download and Install
 
-Go to the [Releases page](https://github.com/qoobatov/ultratrace-backend/releases)
+Go to the [Releases page](https://github.com/qoobatov/ultratrace_refactoring/releases)
 and download the latest `ultratrace-vX.X.X.zip` file. Extract it to a
 folder of your choice.
 

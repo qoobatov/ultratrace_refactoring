@@ -23,6 +23,7 @@ build/
 dist/
 *.egg-info/
 *.egg
+*.zip
 
 # Testing
 .pytest_cache/
