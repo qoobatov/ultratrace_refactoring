@@ -1,25 +1,23 @@
-# UltraTrace
-
-UltraTrace is a web-based annotation tool for ultrasound tongue imaging,
-used for phonetic research. It lets you trace the tongue contour across
-video frames, synchronized with audio and TextGrid annotations.
-
-## Quick Start (for researchers)
-
-This is the simplest way to run UltraTrace — no need to manage the
-frontend and backend separately.
+## Quick Start
 
 ### 1. Requirements
 
 - Python 3.10 or newer
 
-### 2. Install
+### 2. Download and Install
+
+Go to the [Releases page](https://github.com/qoobatov/ultratrace-backend/releases)
+and download the latest `ultratrace-vX.X.X.zip` file. Extract it to a
+folder of your choice.
+
+### Install
+
+Open a terminal in the extracted folder:
 
 ```bash
 python -m venv venv
 source venv/bin/activate      # Linux/macOS
 # or: venv\Scripts\activate   # Windows
-
 pip install .
 ```
 
