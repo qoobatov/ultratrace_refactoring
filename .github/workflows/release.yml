@@ -15,7 +15,7 @@ jobs:
       - name: Checkout frontend
         uses: actions/checkout@v4
         with:
-          repository: qoobatov/ultratrace-frontend
+          repository: qoobatov/ultratrace_frontend
           path: frontend-src
 
       - name: Set up Node.js
