@@ -47,3 +47,6 @@ data/
 
 # Generated medical image folders
 *_dicom_to_png/
+
+#frontend_dist/
+frontend_dist/

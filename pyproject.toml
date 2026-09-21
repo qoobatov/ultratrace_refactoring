@@ -1,0 +1,34 @@
+[project]
+name = "ultratrace"
+version = "0.1.0"
+description = "UltraTrace — ultrasound tongue imaging annotation tool"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "pydantic>=2.0",
+    "numpy>=1.24",
+    "pydicom>=2.4",
+    "Pillow>=10.0",
+    "matplotlib>=3.7",
+    "textgrid>=1.5",
+    "pydub>=0.25.1",
+    "audioop-lts; python_version >= '3.13'",
+    "soundfile>=0.12",
+    "scipy>=1.10",
+    "mutagen",
+]
+
+[project.scripts]
+ultratrace = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["../frontend_dist/**/*"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
