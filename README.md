@@ -17,7 +17,7 @@ Open a terminal in the extracted folder:
 ```bash
 python -m venv venv
 source venv/bin/activate      # Linux/macOS
-# or: venv/Scripts/activate   # Windows
+# or: venv\Scripts\activate   # Windows
 pip install .
 ```
 
@@ -32,8 +32,14 @@ folder called `my_study`.
 From inside your study folder:
 
 ```bash
-cd my_study
 ultratrace web
+```
+
+If you don't specify a folder, a window will open asking you to select
+your study data directory. You can also pass the path directly:
+
+```bash
+ultratrace web /path/to/your/study
 ```
 
 You should see:
