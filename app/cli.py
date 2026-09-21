@@ -1,5 +1,8 @@
 import argparse
 import os
+import socket
+import threading
+import time
 import webbrowser
 
 import uvicorn
@@ -38,16 +41,35 @@ def build_parser():
     return parser
 
 
+def _wait_for_server(host: str, port: int, timeout: float = 10.0):
+    """Опрашивает порт, пока сервер не начнёт принимать соединения."""
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.1)
+    return False
+
+
 def run_web(args):
     print("Starting server")
-    print(f"Open http://localhost:{args.port} in your browser")
 
     os.environ["ULTRA_TRACE_DATA"] = os.path.abspath(args.data_path)
 
-    if not args.no_browser:
-        webbrowser.open(f"http://localhost:{args.port}")
+    host = "127.0.0.1"
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=args.port)
+    if not args.no_browser:
+
+        def open_when_ready():
+            if _wait_for_server(host, args.port):
+                webbrowser.open(f"http://localhost:{args.port}")
+
+        threading.Thread(target=open_when_ready, daemon=True).start()
+
+    print(f"Open http://localhost:{args.port} in your browser")
+    uvicorn.run("app.main:app", host=host, port=args.port)
 
 
 def main():

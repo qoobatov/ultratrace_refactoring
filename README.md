@@ -1,29 +1,119 @@
-Временное содержание этого файла
+# UltraTrace
 
-# UltraTrace Backend – Quick Start
+UltraTrace is a web-based annotation tool for ultrasound tongue imaging,
+used for phonetic research. It lets you trace the tongue contour across
+video frames, synchronized with audio and TextGrid annotations.
 
-- Python 3.10 или новее.
+## Quick Start (for researchers)
 
-2. Установка зависимостей
+This is the simplest way to run UltraTrace — no need to manage the
+frontend and backend separately.
+
+### 1. Requirements
+
+- Python 3.10 or newer
+
+### 2. Install
 
 ```bash
 python -m venv venv
 source venv/bin/activate      # Linux/macOS
-# или venv\Scripts\activate   # Windows
+# or: venv\Scripts\activate   # Windows
+
+pip install .
+```
+
+### 3. Prepare your data
+
+Place your study folder (containing `.dicom` or `.ult` files, audio,
+and a `.TextGrid` file) somewhere on your computer — for example, a
+folder called `my_study`.
+
+### 4. Run
+
+From inside your study folder:
+
+```bash
+cd my_study
+ultratrace web
+```
+
+You should see:
+
+Starting server
+Open http://localhost:3000 in your browser
+
+Your browser will open automatically at `http://localhost:3000` with
+UltraTrace ready to use, loaded with the data from the current folder.
+
+**Optional flags:**
+
+```bash
+ultratrace web /path/to/other_study   # use a different data folder
+ultratrace web -p 8080                # run on a different port
+ultratrace web -n                     # don't open a browser automatically
+```
+
+To stop the server, press `Ctrl+C` in the terminal.
+
+---
+
+## Development Setup
+
+This section is for developers working on UltraTrace itself. The
+frontend and backend live in separate repositories and are run
+independently for hot-reloading during development.
+
+### Backend
+
+```bash
+python -m venv venv
+source venv/bin/activate      # Linux/macOS
+# or: venv\Scripts\activate   # Windows
+
 pip install -r requirements.txt
+```
 
-3. Подготовка данных
+By default the backend looks for study data in `data/sample_study`.
+To use a different folder, set an environment variable:
 
-Положите папку с исследованием (содержащую файлы .dicom или .ult, аудио, .TextGrid) в data/sample_study.
+```bash
+export ULTRA_TRACE_DATA=/full/path/to/folder
+# on Windows: set ULTRA_TRACE_DATA=C:\path\to\folder
+```
 
-По умолчанию сервер ищет данные в data/sample_study.
-Чтобы указать другой путь, установите переменную окружения:
+Run the backend:
 
-bash
-export ULTRA_TRACE_DATA=/полный/путь/к/папке
-(для Windows: set ULTRA_TRACE_DATA=C:\путь\к\папке)
-
-4. Запуск сервера
-bash
+```bash
 uvicorn app.main:app --reload
 ```
+
+This starts the API server at `http://127.0.0.1:8000`.
+
+### Frontend
+
+In the separate `ultratrace-frontend` repository:
+
+```bash
+npm install
+npm run dev
+```
+
+This starts the frontend at `http://localhost:5173`, which talks to
+the backend at `http://127.0.0.1:8000` automatically.
+
+### Building a release
+
+To package a new version for the Quick Start install above, the
+frontend needs to be built and copied into the backend repository:
+
+```bash
+# in ultratrace-frontend
+npm run build
+
+# copy the build output into the backend repo
+cp -r dist /path/to/ultratrace-backend/frontend_dist
+```
+
+The backend will then serve this build automatically when run via
+`ultratrace web` or `uvicorn app.main:app`.
