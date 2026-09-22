@@ -12,7 +12,7 @@ folder of your choice.
 
 ### Install
 
-Open a terminal in the extracted folder:
+Open a terminal in the extracted folder
 
 ```bash
 python -m venv venv
