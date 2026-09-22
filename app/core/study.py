@@ -71,6 +71,7 @@ class StudySession:
             )
 
     def _init_current_file(self):
+        print("DEBUG current_file:", self.current_file)
         ext = self.current_file["extensions"]
 
         self.mode = None

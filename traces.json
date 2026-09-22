@@ -1,9 +1,0 @@
-{
-  "default_trace": "xxx",
-  "traces": {
-    "xxx": {
-      "color": "#192edb",
-      "frames": {}
-    }
-  }
-}
