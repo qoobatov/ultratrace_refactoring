@@ -85,7 +85,7 @@ def extract_intervals(tg: TextGridFile, frame_tier_name: str = "frames") -> list
         if tier.name == frame_tier_name or tier.name == frame_tier_name + ".original":
             continue
         if isinstance(tier, IntervalTier):
-            for interval in tier:
+            for idx, interval in enumerate(tier):
                 if interval.mark:
                     intervals.append(
                         {
@@ -94,6 +94,29 @@ def extract_intervals(tg: TextGridFile, frame_tier_name: str = "frames") -> list
                             "file": "",  # будет заполнено, когда узнаем имя файла
                             "start": interval.minTime,
                             "end": interval.maxTime,
+                            "idx": idx,  # реальный индекс в тире (включая пустые)
                         }
                     )
     return intervals
+
+
+def save_textgrid(tg: TextGridFile, path: str) -> None:
+    """
+    Сохраняет TextGrid в файл в long-формате Praat.
+    Атомарно: пишет во временный файл и заменяет оригинал.
+    """
+    import os
+
+    dir_name = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".textgrid-", suffix=".tmp", dir=dir_name)
+    os.close(fd)
+    try:
+        tg.write(tmp_path)
+        os.replace(tmp_path, path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        raise

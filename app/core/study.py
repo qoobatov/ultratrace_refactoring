@@ -1,4 +1,5 @@
 import os
+import shutil
 import logging
 from PIL import Image
 from .io.framereader import READERS, LABEL_TO_READER, DicomPNGReader
@@ -7,11 +8,14 @@ from .io.textgrid_io import (
     find_frame_tier_name,
     generate_frame_tier,
     extract_intervals,
+    save_textgrid,
+    ALIGNMENT_TIER_NAMES,
 )
 from .io.audio_reader import AudioReader
 from .io.contour_manager import ContourManager
 from .io.file_discovery import load_or_generate_metadata
 from .search_service import search_intervals
+from textgrid import IntervalTier
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,8 @@ class StudySession:
         self._reader_cache = {}  # {(file_index, method_label): reader}
         self.audio_reader = None
         self.textgrid = None
+        self.textgrid_path = None
+        self._textgrid_backup_done = False
         self.frame_tier_name = None
         self._init_current_file()
 
@@ -117,16 +123,18 @@ class StudySession:
 
         # TextGrid
         self.textgrid = None
+        self.textgrid_path = None
         self.frame_tier_name = None
         tg_rel = ext.get(".TextGrid")
         if tg_rel:
             tg_path = os.path.join(self.data_path, tg_rel)
             self.textgrid = load_textgrid(tg_path)
+            self.textgrid_path = tg_path
         else:
             max_time = 1.0
             if self._original_frame_times:
                 max_time = max(self._original_frame_times) + self.offset
-            from textgrid import TextGrid as TGFile, IntervalTier
+            from textgrid import TextGrid as TGFile
 
             self.textgrid = TGFile(maxTime=max_time)
             sentence_tier = IntervalTier("sentence")
@@ -198,6 +206,7 @@ class StudySession:
         self.current_file = self.file_sets[index]
         self.offset = self._load_offset()
         self._original_frame_times = []
+        self._textgrid_backup_done = False
         self._init_current_file()
 
     def rescan(self):
@@ -265,6 +274,69 @@ class StudySession:
         for iv in intervals:
             iv["file"] = fname
         return intervals
+
+    def update_interval_text(self, tier_name: str, idx: int, new_text: str) -> dict:
+        """Меняет текст интервала (mark) и сохраняет TextGrid на диск."""
+        if not self.textgrid:
+            raise ValueError("No TextGrid loaded")
+        if not self.textgrid_path:
+            raise ValueError("TextGrid path unknown; cannot save")
+        if tier_name in ALIGNMENT_TIER_NAMES:
+            raise ValueError(f"Tier '{tier_name}' is read-only")
+
+        target = None
+        for t in self.textgrid.tiers:
+            if t.name == tier_name:
+                target = t
+                break
+        if target is None:
+            raise ValueError(f"Tier '{tier_name}' not found")
+        if not isinstance(target, IntervalTier):
+            raise ValueError(f"Tier '{tier_name}' is not an interval tier")
+        if idx < 0 or idx >= len(target):
+            raise ValueError(f"Interval index {idx} out of range")
+
+        # Backup один раз за сессию до первой правки
+        if not self._textgrid_backup_done:
+            backup_path = self.textgrid_path + ".bak"
+            if not os.path.exists(backup_path):
+                shutil.copy2(self.textgrid_path, backup_path)
+            self._textgrid_backup_done = True
+
+        interval = target[idx]
+        interval.mark = new_text
+        save_textgrid(self.textgrid, self.textgrid_path)
+
+        return {
+            "tier": tier_name,
+            "idx": idx,
+            "text": new_text,
+            "start": interval.minTime,
+            "end": interval.maxTime,
+        }
+
+    def has_textgrid_backup(self) -> bool:
+        """Есть ли .bak-снимок TextGrid (т.е. были ли правки)."""
+        if not self.textgrid_path:
+            return False
+        return os.path.exists(self.textgrid_path + ".bak")
+
+    def revert_textgrid_from_backup(self) -> dict:
+        """Восстанавливает .TextGrid из .bak и перезагружает его в память."""
+        if not self.textgrid_path:
+            raise ValueError("TextGrid path unknown")
+        backup_path = self.textgrid_path + ".bak"
+        if not os.path.exists(backup_path):
+            raise ValueError("No backup found for this TextGrid")
+
+        shutil.copy2(backup_path, self.textgrid_path)
+        self.textgrid = load_textgrid(self.textgrid_path)
+        self.frame_tier_name = find_frame_tier_name(self.textgrid)
+
+        return {
+            "ok": True,
+            "intervals": self.get_all_intervals(),
+        }
 
     def search(self, pattern: str, context_size: int = 3) -> list:
         return search_intervals(self.get_all_intervals(), pattern, context_size)
